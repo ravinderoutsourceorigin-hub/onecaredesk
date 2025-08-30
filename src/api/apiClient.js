@@ -1,7 +1,7 @@
 // API client for authenticated requests to the backend
 import { useKindeAuth } from '@kinde-oss/kinde-auth-react';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://onecaredesk.onrender.com/api';
 
 // Get authentication headers
 const getAuthHeaders = () => {

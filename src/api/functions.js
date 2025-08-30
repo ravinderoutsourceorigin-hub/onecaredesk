@@ -3,8 +3,10 @@ import { base44 } from './base44Client';
 // Create a proper agency invitation function using our backend APIs
 export const sendAgencyInvitation = async (invitationData) => {
   try {
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://onecaredesk.onrender.com/api';
+    
     // Step 1: Create the agency
-    const agencyResponse = await fetch('http://localhost:5000/api/agencies', {
+    const agencyResponse = await fetch(`${API_BASE_URL}/agencies`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -32,7 +34,7 @@ export const sendAgencyInvitation = async (invitationData) => {
     console.log('Agency created:', agencyData);
 
     // Step 2: Create the owner user
-    const userResponse = await fetch('http://localhost:5000/api/users', {
+    const userResponse = await fetch(`${API_BASE_URL}/users`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
