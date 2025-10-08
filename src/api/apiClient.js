@@ -71,7 +71,7 @@ export const AgencyAPI = {
 
 // Appointments API
 export const AppointmentAPI = {
-  list: () => apiRequest('/appointments'),
+  list: () => apiRequest('/appointments').then(data => data.appointments || []),
   create: (data) => apiRequest('/appointments', {
     method: 'POST',
     body: JSON.stringify(data)
@@ -88,7 +88,7 @@ export const AppointmentAPI = {
 
 // Caregivers API
 export const CaregiverAPI = {
-  list: () => apiRequest('/caregivers'),
+  list: () => apiRequest('/caregivers').then(data => data.caregivers || []),
   create: (data) => apiRequest('/caregivers', {
     method: 'POST',
     body: JSON.stringify(data)
@@ -105,7 +105,7 @@ export const CaregiverAPI = {
 
 // Signatures API
 export const SignatureAPI = {
-  list: () => apiRequest('/signatures'),
+  list: () => apiRequest('/signatures').then(data => data.signatures || []),
   create: (data) => apiRequest('/signatures', {
     method: 'POST',
     body: JSON.stringify(data)
@@ -122,7 +122,7 @@ export const SignatureAPI = {
 
 // Configurations API
 export const ConfigurationAPI = {
-  list: () => apiRequest('/configurations'),
+  list: () => apiRequest('/configurations').then(data => data.configurations || []),
   create: (data) => apiRequest('/configurations', {
     method: 'POST',
     body: JSON.stringify(data)
@@ -139,7 +139,7 @@ export const ConfigurationAPI = {
 
 // Leads API (when needed)
 export const LeadAPI = {
-  list: () => apiRequest('/leads'),
+  list: () => apiRequest('/leads').then(data => data.leads || []),
   create: (data) => apiRequest('/leads', {
     method: 'POST',
     body: JSON.stringify(data)
@@ -156,7 +156,7 @@ export const LeadAPI = {
 
 // Patients API (when needed)
 export const PatientAPI = {
-  list: () => apiRequest('/patients'),
+  list: () => apiRequest('/patients').then(data => data.patients || []),
   create: (data) => apiRequest('/patients', {
     method: 'POST',
     body: JSON.stringify(data)
@@ -173,7 +173,7 @@ export const PatientAPI = {
 
 // Documents API (when needed)
 export const DocumentAPI = {
-  list: () => apiRequest('/documents'),
+  list: () => apiRequest('/documents').then(data => data.documents || []),
   create: (data) => apiRequest('/documents', {
     method: 'POST',
     body: JSON.stringify(data)
@@ -190,7 +190,7 @@ export const DocumentAPI = {
 
 // Tasks API (when needed)
 export const TaskAPI = {
-  list: () => apiRequest('/tasks'),
+  list: () => apiRequest('/tasks').then(data => data.tasks || []),
   create: (data) => apiRequest('/tasks', {
     method: 'POST',
     body: JSON.stringify(data)
@@ -205,6 +205,23 @@ export const TaskAPI = {
   get: (id) => apiRequest(`/tasks/${id}`)
 };
 
+// Form Templates API
+export const FormTemplateAPI = {
+  list: () => apiRequest('/form-templates').then(data => data.form_templates || []),
+  create: (data) => apiRequest('/form-templates', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  update: (id, data) => apiRequest(`/form-templates/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  delete: (id) => apiRequest(`/form-templates/${id}`, {
+    method: 'DELETE'
+  }),
+  get: (id) => apiRequest(`/form-templates/${id}`)
+};
+
 export default {
   Agency: AgencyAPI,
   Appointment: AppointmentAPI,
@@ -214,5 +231,6 @@ export default {
   Lead: LeadAPI,
   Patient: PatientAPI,
   Document: DocumentAPI,
-  Task: TaskAPI
+  Task: TaskAPI,
+  FormTemplate: FormTemplateAPI
 };

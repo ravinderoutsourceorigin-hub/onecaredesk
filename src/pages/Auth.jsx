@@ -1,31 +1,39 @@
 
 import React, { useState } from "react";
+import { useKindeAuth } from '@kinde-oss/kinde-auth-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Eye, EyeOff, Home, ArrowLeft } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Loader2, Eye, EyeOff, Mail, Lock, User, ArrowLeft, Chrome } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { auth } from "@/api/functions";
-import { requestPasswordReset } from "@/api/functions";
-import { requestUsernameRecovery } from "@/api/functions";
+import { auth, requestPasswordReset, signup, login } from "@/api/functions";
 import Logo from '@/components/shared/Logo';
 
 export default function Auth() {
-  const [mode, setMode] = useState('login'); // 'login', 'forgot-password', 'forgot-username'
-  const [formData, setFormData] = useState({ identifier: "", password: "", email: "" }); // Changed 'username' to 'identifier'
+  const { login: kindeLogin, isLoading: kindeLoading } = useKindeAuth();
+  const [mode, setMode] = useState('login'); // 'login', 'signup', 'forgot-password'
+  const [formData, setFormData] = useState({ 
+    identifier: "", 
+    email: "",
+    username: "",
+    firstName: "",
+    lastName: "",
+    password: "",
+    confirmPassword: ""
+  });
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false); // Added rememberMe state
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [lastSubmitTime, setLastSubmitTime] = useState(0);
   const navigate = useNavigate();
-  // Removed emergencyUsername state as emergency login is removed
-  // const [emergencyUsername, setEmergencyUsername] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -58,30 +66,24 @@ export default function Auth() {
     try {
       console.log('🔐 Attempting login...');
       
-      const response = await auth({
-        action: 'login',
-        identifier: formData.identifier.trim(), // Changed username to identifier
-        password: formData.password,
-        rememberMe: rememberMe // Added rememberMe to auth payload
+      const response = await login({
+        identifier: formData.identifier.trim(),
+        password: formData.password
       });
 
-      console.log('📡 Login response status:', response.status);
+      console.log('📡 Login response:', response);
 
       if (response.data?.success) {
         console.log('✅ Login successful');
         
-        // Show bypass warning if active
-        if (response.data?.bypass_active) {
-          console.warn('🚨 PASSWORD BYPASS IS ACTIVE - Remember to disable this in production!');
-        }
-        
+        // Store user data and token
         localStorage.setItem('app_user', JSON.stringify(response.data.user));
-        
-        if (response.data.needs_password_change) {
-          navigate(createPageUrl('ChangePassword'));
-        } else {
-          navigate(createPageUrl('Dashboard'));
+        if (response.data.token) {
+          localStorage.setItem('auth_token', response.data.token);
         }
+        
+        // Navigate to dashboard
+        navigate(createPageUrl('Dashboard'));
       } else {
         console.log('❌ Login failed:', response.data?.error);
         setError(response.data?.error || "Login failed. Please check your credentials.");
@@ -100,6 +102,75 @@ export default function Auth() {
       }
       
       setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Sign Up Handler
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    // Validation
+    if (!formData.email.trim() || !formData.username.trim() || 
+        !formData.firstName.trim() || !formData.lastName.trim() || 
+        !formData.password.trim()) {
+      setError("Please fill in all required fields.");
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      console.log('📝 Attempting signup...');
+      
+      const response = await signup({
+        email: formData.email.trim(),
+        username: formData.username.trim(),
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        password: formData.password
+      });
+
+      console.log('📡 Signup response:', response);
+
+      if (response.data?.success) {
+        console.log('✅ Signup successful');
+        setSuccess("Account created successfully! You can now sign in.");
+        
+        // Reset form and switch to login
+        setFormData({
+          identifier: formData.username,
+          email: "",
+          username: "",
+          firstName: "",
+          lastName: "",
+          password: "",
+          confirmPassword: ""
+        });
+        
+        setTimeout(() => {
+          setMode('login');
+          setSuccess("");
+        }, 2000);
+      } else {
+        console.log('❌ Signup failed:', response.data?.error);
+        setError(response.data?.error || "Signup failed. Please try again.");
+      }
+    } catch (error) {
+      console.error("❌ Signup error:", error);
+      setError(error.response?.data?.error || error.message || "Signup failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -205,6 +276,31 @@ export default function Auth() {
           </Alert>
         )}
 
+        {/* Kinde Google Sign In */}
+        <Button 
+          onClick={() => kindeLogin()} 
+          variant="outline" 
+          className="w-full mb-4 h-11 border-gray-300 hover:bg-gray-50"
+          disabled={kindeLoading}
+          type="button"
+        >
+          {kindeLoading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Chrome className="mr-2 h-4 w-4 text-blue-600" />
+          )}
+          Continue with Google
+        </Button>
+
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <Separator className="w-full" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2 text-gray-500">Or continue with email</span>
+          </div>
+        </div>
+
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="identifier">Username or Email</Label>
@@ -288,6 +384,207 @@ export default function Auth() {
           >
             Forgot Username?
           </button>
+        </div>
+
+        {/* Sign Up Link */}
+        <div className="text-center text-sm mt-4">
+          <span className="text-gray-600">Don't have an account? </span>
+          <Button
+            type="button"
+            variant="link"
+            className="px-0 text-blue-600 hover:text-blue-700 font-semibold"
+            onClick={() => setMode('signup')}
+          >
+            Sign up
+          </Button>
+        </div>
+      </CardContent>
+    </>
+  );
+
+  // Render Signup Form
+  const renderSignupForm = () => (
+    <>
+      <CardHeader className="space-y-1 pb-6">
+        <CardTitle className="text-2xl font-bold text-center text-gray-900">Create Account</CardTitle>
+        <CardDescription className="text-center">Sign up to get started</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {success && (
+          <Alert className="mb-6 bg-green-50 border-green-200">
+            <AlertDescription className="text-green-800">{success}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Kinde Google Sign Up */}
+        <Button 
+          onClick={() => kindeLogin()} 
+          variant="outline" 
+          className="w-full mb-4 h-11 border-gray-300 hover:bg-gray-50"
+          disabled={kindeLoading}
+          type="button"
+        >
+          {kindeLoading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Chrome className="mr-2 h-4 w-4 text-blue-600" />
+          )}
+          Sign up with Google
+        </Button>
+
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <Separator className="w-full" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2 text-gray-500">Or sign up with email</span>
+          </div>
+        </div>
+
+        {/* Signup Form */}
+        <form onSubmit={handleSignup} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First Name *</Label>
+              <Input
+                id="firstName"
+                name="firstName"
+                type="text"
+                placeholder="John"
+                value={formData.firstName}
+                onChange={handleChange}
+                disabled={isLoading}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name *</Label>
+              <Input
+                id="lastName"
+                name="lastName"
+                type="text"
+                placeholder="Doe"
+                value={formData.lastName}
+                onChange={handleChange}
+                disabled={isLoading}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="email">Email *</Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="john@example.com"
+                value={formData.email}
+                onChange={handleChange}
+                className="pl-10"
+                disabled={isLoading}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="username">Username *</Label>
+            <div className="relative">
+              <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                placeholder="johndoe"
+                value={formData.username}
+                onChange={handleChange}
+                className="pl-10"
+                disabled={isLoading}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password">Password *</Label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Minimum 8 characters"
+                value={formData.password}
+                onChange={handleChange}
+                className="pl-10 pr-10"
+                disabled={isLoading}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirm Password *</Label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="Re-enter your password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className="pl-10 pr-10"
+                disabled={isLoading}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+              >
+                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          <Button type="submit" className="w-full h-11" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating account...
+              </>
+            ) : (
+              "Create Account"
+            )}
+          </Button>
+        </form>
+
+        <div className="text-center text-sm mt-4">
+          <span className="text-gray-600">Already have an account? </span>
+          <Button
+            type="button"
+            variant="link"
+            className="px-0 text-blue-600 hover:text-blue-700 font-semibold"
+            onClick={() => setMode('login')}
+          >
+            Sign in
+          </Button>
         </div>
       </CardContent>
     </>
@@ -426,6 +723,7 @@ export default function Auth() {
         {/* Login Card */}
         <Card className="shadow-xl border-0">
           {mode === 'login' && renderLoginForm()}
+          {mode === 'signup' && renderSignupForm()}
           {mode === 'forgot-password' && renderPasswordResetForm()}
           {mode === 'forgot-username' && renderUsernameRecoveryForm()}
         </Card>

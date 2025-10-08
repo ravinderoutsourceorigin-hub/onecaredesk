@@ -7,15 +7,16 @@ const { Pool } = pg;
 
 // Database configuration
 const dbConfig = {
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
-  ssl: { rejectUnauthorized: false }, // Enable SSL for Neon
-  max: 20, // Maximum number of clients in pool
-  idleTimeoutMillis: 30000, // How long a client is allowed to remain idle
-  connectionTimeoutMillis: 2000, // How long to wait for a connection
+  connectionString: process.env.DATABASE_URL,
+  ssl: { 
+    rejectUnauthorized: false 
+  },
+  max: 10, // Reduced pool size for Neon
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 30000, // Increased timeout
+  query_timeout: 60000,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 };
 
 // Create connection pool
@@ -23,19 +24,36 @@ export const pool = new Pool(dbConfig);
 
 // Test database connection
 export const connectDB = async () => {
-  try {
-    const client = await pool.connect();
-    console.log('✅ PostgreSQL Connected successfully');
-    
-    // Test query
-    const result = await client.query('SELECT NOW()');
-    console.log('🕐 Database time:', result.rows[0].now);
-    
-    client.release();
-    return true;
-  } catch (error) {
-    console.error('❌ Database connection failed:', error.message);
-    throw error;
+  let client;
+  let retries = 3;
+  
+  while (retries > 0) {
+    try {
+      console.log(`🔄 Attempting to connect to database... (${4 - retries}/3)`);
+      client = await pool.connect();
+      console.log('✅ PostgreSQL Connected successfully');
+      
+      // Test query
+      const result = await client.query('SELECT NOW()');
+      console.log('🕐 Database time:', result.rows[0].now);
+      
+      client.release();
+      return true;
+    } catch (error) {
+      console.error(`❌ Database connection attempt ${4 - retries} failed:`, error.message);
+      retries--;
+      
+      if (client) client.release();
+      
+      if (retries === 0) {
+        console.error('❌ All connection attempts failed. Database unavailable.');
+        console.error('💡 Tip: Check if Neon database is active and not suspended');
+        throw error;
+      }
+      
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
   }
 };
 
@@ -70,3 +88,18 @@ export const transaction = async (callback) => {
 };
 
 export default pool;
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('🛑 SIGTERM received. Closing database pool...');
+  await pool.end();
+  console.log('✅ Database pool closed');
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('🛑 SIGINT received. Closing database pool...');
+  await pool.end();
+  console.log('✅ Database pool closed');
+  process.exit(0);
+});

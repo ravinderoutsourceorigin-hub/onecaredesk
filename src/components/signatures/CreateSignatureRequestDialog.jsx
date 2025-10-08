@@ -112,25 +112,25 @@ export default function CreateSignatureRequestDialog({ open, onOpenChange, onSub
           } else if (provider === 'jotform') {
             console.log('🔍 Loading JotForm documents...');
             try {
-              const response = await jotFormAPI({ action: 'getSignDocuments' });
+              const response = await jotFormAPI({ action: 'getForms' });
               console.log('📦 JotForm API Response:', response);
 
               if (response.error) {
                 console.error('❌ JotForm Error:', response.error);
-                throw new Error(response.error.error || response.error.message || 'Failed to get JotForm documents');
+                throw new Error(response.error.error || response.error.message || 'Failed to get JotForm forms');
               }
 
-              const fetchedJotformDocs = response.data?.documents || [];
-              console.log('✅ Fetched JotForm docs:', fetchedJotformDocs);
+              const fetchedJotformDocs = response.data?.forms || [];
+              console.log('✅ Fetched JotForm forms:', fetchedJotformDocs);
               
               setJotformDocuments(fetchedJotformDocs);
               setBoldSignTemplates([]);
 
               if (fetchedJotformDocs.length > 0) {
                 setError(null);
-                console.log(`✅ Successfully loaded ${fetchedJotformDocs.length} JotForm documents`);
+                console.log(`✅ Successfully loaded ${fetchedJotformDocs.length} JotForm forms`);
               } else {
-                setError('No JotForm Sign documents found. Please create sign documents in your JotForm Sign account first.');
+                setError('No JotForm forms found. Please create forms in your JotForm account first.');
               }
             } catch (jotformError) {
               console.error('🚨 JotForm Error Details:', jotformError);
@@ -288,6 +288,7 @@ export default function CreateSignatureRequestDialog({ open, onOpenChange, onSub
 
         if (apiResponse.data && apiResponse.data.success) {
           requestData.signature_url = apiResponse.data.formUrl;
+          requestData.form_url = apiResponse.data.formUrl; // Add form URL for email
           requestData.status = 'sent';
           requestData.sent_date = new Date().toISOString();
         }

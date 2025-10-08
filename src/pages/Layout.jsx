@@ -27,23 +27,44 @@ const publicPages = [
  */
 export default function Layout({ children, currentPageName }) {
   
-  // Explicitly handle the root URL case.
-  // If currentPageName is not provided AND the browser path is the root '/',
-  // we force the page to be 'Home_new'.
+  // Get effective page name
   let effectivePageName = currentPageName;
+  
+  // Handle root URL case
   if (!effectivePageName && typeof window !== 'undefined' && window.location.pathname === '/') {
     effectivePageName = 'Home_new';
   }
+  
+  // If still no page name, try to extract from URL
+  if (!effectivePageName && typeof window !== 'undefined') {
+    const path = window.location.pathname;
+    const pathParts = path.split('/').filter(Boolean);
+    if (pathParts.length > 0) {
+      const lastPart = pathParts[pathParts.length - 1];
+      // Capitalize first letter to match page names
+      effectivePageName = lastPart.charAt(0).toUpperCase() + lastPart.slice(1);
+    }
+  }
+
+  // 🔍 DEBUG: Log layout decisions
+  console.log('🎨 LAYOUT DEBUG:', {
+    currentPageName,
+    effectivePageName,
+    pathname: typeof window !== 'undefined' ? window.location.pathname : 'SSR',
+    isPublic: publicPages.includes(effectivePageName)
+  });
 
   const isPublic = publicPages.includes(effectivePageName);
 
   if (isPublic) {
     // Render public pages directly. No auth checks happen here.
-    return children;
+    console.log('✅ LAYOUT DEBUG: Rendering public page:', effectivePageName);
+    return <>{children}</>;
   }
 
   // For any other page, wrap it in the ProtectedLayout which will
   // handle the authentication checks and redirects.
+  console.log('🔒 LAYOUT DEBUG: Rendering protected page:', effectivePageName);
   return (
     <ProtectedLayout currentPageName={effectivePageName}>
       {children}

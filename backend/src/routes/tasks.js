@@ -6,7 +6,7 @@ const router = express.Router();
 // Get all tasks
 router.get('/', async (req, res) => {
   try {
-    const result = await query('SELECT * FROM tasks ORDER BY created_at DESC');
+    const result = await query('SELECT * FROM tasks ORDER BY created_date DESC');
     res.json({ tasks: result.rows, total: result.rows.length });
   } catch (error) {
     console.error('Get tasks error:', error);
@@ -19,7 +19,7 @@ router.post('/', async (req, res) => {
   try {
     const { title, description, status = 'pending', priority = 'medium' } = req.body;
     const result = await query(
-      'INSERT INTO tasks (title, description, status, priority, created_at, updated_at) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING *',
+      'INSERT INTO tasks (title, description, status, priority, created_date, updated_date) VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING *',
       [title, description, status, priority]
     );
     res.status(201).json({ task: result.rows[0] });

@@ -50,10 +50,11 @@ export default function WorkQueue() {
 
   const loadTasks = async (agencyId) => {
     try {
-      const allTasks = await Task.filter({ agency_id: agencyId }, "-created_date", 50);
+      const allTasks = await Task.list();
       const activeTasks = allTasks
-        .filter(task => ['pending', 'in_progress'].includes(task.status))
-        .sort((a, b) => new Date(a.due_date || '9999') - new Date(b.due_date || '9999'));
+        .filter(task => task.agency_id === agencyId && ['pending', 'in_progress'].includes(task.status))
+        .sort((a, b) => new Date(a.due_date || '9999') - new Date(b.due_date || '9999'))
+        .slice(0, 50); // Limit to 50 results
       setTasks(activeTasks);
     } catch (error) {
       console.error("Error loading tasks:", error);

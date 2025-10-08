@@ -26,7 +26,7 @@ export default function UpcomingAppointments() {
       const nextWeek = addDays(today, 7);
       
       // Get all appointments first
-      const allAppointments = await Appointment.list("-appointment_date", 50);
+      const allAppointments = await Appointment.list();
       console.log("All appointments loaded:", allAppointments);
       
       // Filter for upcoming appointments in the next 7 days

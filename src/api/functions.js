@@ -87,7 +87,7 @@ export const boldSignAPI = base44.functions.boldSignAPI;
 
 export const createAgency = base44.functions.createAgency;
 
-export const sendEmail = base44.functions.sendEmail;
+// export const sendEmail = base44.functions.sendEmail; // Replaced with custom implementation
 
 export const fixAdminUser = base44.functions.fixAdminUser;
 
@@ -105,6 +105,8 @@ export const debugAuth = base44.functions.debugAuth;
 
 export const resendInvitationEmail = base44.functions.resendInvitationEmail;
 
+export const resendFormEmail = base44.functions.resendFormEmail;
+
 export const debugLogin = base44.functions.debugLogin;
 
 export const requestPasswordReset = base44.functions.requestPasswordReset;
@@ -113,11 +115,186 @@ export const requestUsernameRecovery = base44.functions.requestUsernameRecovery;
 
 export const resetPassword = base44.functions.resetPassword;
 
-export const jotFormAPI = base44.functions.jotFormAPI;
+// Signup function using our backend
+export const signup = async (params) => {
+  try {
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+    
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: params.email,
+        password: params.password,
+        firstName: params.firstName,
+        lastName: params.lastName,
+        username: params.username,
+        role: params.role || 'user'
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        data: {
+          success: false,
+          error: data.error || data.message || 'Signup failed'
+        }
+      };
+    }
+
+    return {
+      data: {
+        success: true,
+        user: data.user,
+        token: data.token,
+        message: data.message
+      }
+    };
+  } catch (error) {
+    console.error('Signup error:', error);
+    return {
+      data: {
+        success: false,
+        error: error.message || 'Failed to connect to signup service'
+      }
+    };
+  }
+};
+
+// Login function using our backend
+export const login = async (params) => {
+  try {
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+    
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        identifier: params.identifier,
+        password: params.password
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        data: {
+          success: false,
+          error: data.error || data.message || 'Login failed'
+        }
+      };
+    }
+
+    return {
+      data: {
+        success: true,
+        user: data.user,
+        token: data.token,
+        message: data.message
+      }
+    };
+  } catch (error) {
+    console.error('Login error:', error);
+    return {
+      data: {
+        success: false,
+        error: error.message || 'Failed to connect to login service'
+      }
+    };
+  }
+};
+
+// export const jotFormAPI = base44.functions.jotFormAPI; // Replaced with custom implementation
 
 export const boldSignWebhook = base44.functions.boldSignWebhook;
 
 export const getUserManagementData = base44.functions.getUserManagementData;
 
 export const emergencyLogin = base44.functions.emergencyLogin;
+
+// JotForm API function using our backend
+export const jotFormAPI = async (params) => {
+  try {
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://onecaredesk.onrender.com/api';
+    const token = localStorage.getItem('auth_token') || 'dummy-token';
+    
+    const response = await fetch(`${API_BASE_URL}/integrations/jotform`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(params)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return {
+        data: {
+          success: false,
+          error: errorData.error || 'JotForm API request failed'
+        }
+      };
+    }
+
+    const data = await response.json();
+    return { data };
+  } catch (error) {
+    console.error('JotForm API error:', error);
+    return {
+      data: {
+        success: false,
+        error: error.message || 'Failed to connect to JotForm API'
+      }
+    };
+  }
+};
+
+// Resend Email API function using our backend
+export const sendEmail = async (params) => {
+  try {
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://onecaredesk.onrender.com/api';
+    const token = localStorage.getItem('auth_token') || 'dummy-token';
+    
+    const response = await fetch(`${API_BASE_URL}/integrations/resend`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        action: 'sendEmail',
+        ...params
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return {
+        data: {
+          success: false,
+          error: errorData.error || 'Email sending failed'
+        }
+      };
+    }
+
+    const data = await response.json();
+    return { data };
+  } catch (error) {
+    console.error('Resend API error:', error);
+    return {
+      data: {
+        success: false,
+        error: error.message || 'Failed to send email'
+      }
+    };
+  }
+};
 

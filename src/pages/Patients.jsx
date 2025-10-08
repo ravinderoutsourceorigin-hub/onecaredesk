@@ -1,273 +1,441 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { Patient } from "@/api/entities";
-// No longer importing User, will get from localStorage
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
-import { Plus, HeartHandshake, Search } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
+import {
+  Plus,
+  Search,
+  LayoutGrid,
+  List,
+  Mail,
+  Phone,
+  Edit,
+  Eye,
+  Trash2,
+  HeartHandshake,
+  Users as UsersIcon,
+  Activity,
+  UserPlus as NewUser,
+} from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 import PatientCard from "../components/patients/PatientCard";
 import AddPatientDialog from "../components/patients/AddPatientDialog";
 import Pagination from "../components/shared/Pagination";
 
-// Import security functions
-import { checkPermission, logAuditEvent } from "@/components/utils/Security";
-
-const ITEMS_PER_PAGE = 12;
+const ITEMS_PER_PAGE = 9;
 
 export default function Patients() {
-  const [allPatients, setAllPatients] = useState([]);
+  const [patients, setPatients] = useState([]);
   const [filteredPatients, setFilteredPatients] = useState([]);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [viewMode, setViewMode] = useState("cards");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasPermission, setHasPermission] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const [currentUser, setCurrentUser] = useState(null);
-  const navigate = useNavigate();
 
-  const fetchPatientsForCurrentUserAgency = useCallback(async (user) => {
-    if (!user || !user.agency_id) {
-      console.error("Cannot fetch patients: user or agency_id is missing.");
-      setHasPermission(false);
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        const userString = localStorage.getItem('app_user');
+        if (userString) {
+          const user = JSON.parse(userString);
+          setCurrentUser(user);
+        } else {
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error("Failed to load user:", error);
+        setIsLoading(false);
+      }
+    };
+    loadCurrentUser();
+  }, []);
+
+  const loadPatients = useCallback(async () => {
+    if (!currentUser?.agency_id) {
+      setIsLoading(false);
       return;
     }
-    setIsLoading(true);
     try {
-      // Ensure current user is defined before logging audit event
-      if (user) {
-        await logAuditEvent(user, 'view_patients_page', 'Patient');
-      }
-
-      const patientsData = await Patient.filter({ agency_id: user.agency_id }, '-created_date');
-      setAllPatients(patientsData);
-      setFilteredPatients(patientsData);
+      setIsLoading(true);
+      const data = await Patient.filter({ agency_id: currentUser.agency_id }, "-created_date");
+      setPatients(data || []);
     } catch (error) {
-      console.error("Failed to fetch patients:", error);
-      // Optionally show an error message to the user
+      console.error("Error loading patients:", error);
+      setPatients([]);
     } finally {
       setIsLoading(false);
     }
-  }, []); // Empty dependency array means this function is stable and doesn't recreate
+  }, [currentUser]);
 
   useEffect(() => {
-    const initialize = async () => {
-      setIsLoading(true);
-      try {
-        // --- CORE FIX: Get user from localStorage for consistency ---
-        const userString = localStorage.getItem('app_user');
-        if (!userString) {
-          setHasPermission(false);
-          setIsLoading(false);
-          console.error("No user found in session.");
-          return;
-        }
-        const user = JSON.parse(userString);
-        setCurrentUser(user);
+    if (currentUser) {
+      loadPatients();
+    }
+  }, [currentUser, loadPatients]);
 
-        const permission = await checkPermission(user, 'view_patients');
-        setHasPermission(permission);
+  const filterPatients = useCallback(() => {
+    let filtered = patients;
 
-        if (!permission) {
-          setIsLoading(false);
-          return;
-        }
+    if (searchTerm) {
+      filtered = filtered.filter(p =>
+        `${p.first_name} ${p.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
 
-        if (!user.agency_id) {
-          console.error("User has permission but no agency_id.");
-          setHasPermission(false); // Can't view patients without an agency
-          setIsLoading(false);
-          return;
-        }
+    if (statusFilter !== "all") {
+      filtered = filtered.filter(p => p.status === statusFilter);
+    }
 
-        await fetchPatientsForCurrentUserAgency(user);
-
-      } catch (error) {
-        console.error("Initialization error:", error);
-        setHasPermission(false);
-        setIsLoading(false); // Ensure loading state is reset even on init error
-      }
-    };
-    initialize();
-  }, [fetchPatientsForCurrentUserAgency]); // Depend on fetchPatientsForCurrentUserAgency
+    setFilteredPatients(filtered);
+  }, [patients, searchTerm, statusFilter]);
 
   useEffect(() => {
-    const lowercasedTerm = searchTerm.toLowerCase();
-    const results = allPatients.filter(p =>
-      `${p.first_name} ${p.last_name}`.toLowerCase().includes(lowercasedTerm) ||
-      p.email?.toLowerCase().includes(lowercasedTerm) ||
-      p.phone?.includes(lowercasedTerm)
-    );
-    setFilteredPatients(results);
+    filterPatients();
+  }, [filterPatients]);
+
+  useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, allPatients]);
+  }, [searchTerm, statusFilter]);
 
-  const handlePatientAdded = (newPatient) => {
-    // Add new patient to the beginning and update both lists
-    const updatedPatients = [newPatient, ...allPatients];
-    setAllPatients(updatedPatients);
-    setFilteredPatients(updatedPatients); // Ensure filtered list also gets updated
-    setIsAddDialogOpen(false);
-  };
-
-  const handleViewPatient = (patientId) => {
-    console.log(`Viewing patient with ID: ${patientId}`);
-    // TODO: Navigate to patient details page or open modal
-    navigate(createPageUrl('patient_detail', { patientId: patientId }));
-  };
-
-  const handleEditPatient = (patientId) => {
-    console.log(`Editing patient with ID: ${patientId}`);
-    // TODO: Open edit patient dialog
-    // For now, let's just navigate to a placeholder edit page
-    navigate(createPageUrl('patient_edit', { patientId: patientId }));
+  const handleAddPatient = async (patientData) => {
+    if (!currentUser?.agency_id) return;
+    try {
+      const dataToCreate = { ...patientData, agency_id: currentUser.agency_id };
+      await Patient.create(dataToCreate);
+      setIsAddDialogOpen(false);
+      loadPatients();
+    } catch (error) {
+      console.error("Error adding patient:", error);
+    }
   };
 
   const handleDeletePatient = async (patientId) => {
-    if (!currentUser) {
-      console.error("Cannot delete patient: current user not found.");
-      return;
-    }
     try {
       await Patient.delete(patientId);
-      console.log(`Patient with ID: ${patientId} deleted successfully.`);
-      await logAuditEvent(currentUser, 'delete_patient', 'Patient', patientId);
-      // Refresh the patient list after deletion
-      await fetchPatientsForCurrentUserAgency(currentUser);
+      loadPatients();
     } catch (error) {
       console.error("Failed to delete patient:", error);
-      // Optionally display an error message to the user
     }
   };
 
-  const paginatedPatients = filteredPatients.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredPatients.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const currentPatients = filteredPatients.slice(startIndex, endIndex);
 
-  const renderLoadingSkeleton = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {Array(ITEMS_PER_PAGE).fill(0).map((_, i) => (
-        <Card key={i}>
-          <CardHeader>
-            <div className="flex items-center gap-4">
-              <Skeleton className="h-12 w-12 rounded-full" />
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-[150px]" />
-                <Skeleton className="h-4 w-[100px]" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-[80%]" />
-            <Skeleton className="h-10 w-full" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
+  const statusColors = {
+    active: "bg-green-50 text-green-700 border-green-200",
+    inactive: "bg-gray-50 text-gray-700 border-gray-200",
+    discharged: "bg-red-50 text-red-700 border-red-200",
+  };
+  
+  const careLevelColors = {
+      companion: "bg-blue-100 text-blue-800",
+      personal_care: "bg-purple-100 text-purple-800",
+      skilled_nursing: "bg-red-100 text-red-800",
+      respite: "bg-yellow-100 text-yellow-800",
+  };
 
-  if (isLoading) {
+  if (isLoading && !currentUser) {
     return (
       <div className="p-6 max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-10 w-32" />
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/3 mb-8"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array(6).fill(0).map((_, i) => (
+              <div key={i} className="h-48 bg-gray-200 rounded-lg"></div>
+            ))}
+          </div>
         </div>
-        {renderLoadingSkeleton()}
-      </div>
-    );
-  }
-
-  if (!hasPermission) {
-    return (
-      <div className="p-6 max-w-5xl mx-auto">
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            You do not have permission to view this page. Please contact your administrator.
-          </AlertDescription>
-        </Alert>
       </div>
     );
   }
 
   return (
-    <>
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* Modern Header with Gradient */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-8 mb-8 shadow-2xl"
+      >
+        <div className="relative flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-xl">
+              <HeartHandshake className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl lg:text-4xl font-bold text-white">Patient Management</h1>
+              <p className="text-blue-100 mt-1">Manage your patients, view details, and track their care</p>
+            </div>
+          </div>
+          <Button
+            onClick={() => setIsAddDialogOpen(true)}
+            className="bg-white text-blue-600 hover:bg-blue-50 shadow-lg hover:shadow-xl transition-all"
+            size="lg"
+            disabled={!currentUser?.agency_id}
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add New Patient
+          </Button>
+        </div>
+      </motion.div>
+
+      {/* Stats Cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+      >
+        {[
+          { label: 'Total Patients', value: filteredPatients.length, icon: UsersIcon, color: 'from-blue-500 to-blue-600' },
+          { label: 'Active', value: filteredPatients.filter(p => p.status === 'active').length, icon: Activity, color: 'from-green-500 to-green-600' },
+          { label: 'New This Month', value: filteredPatients.filter(p => {
+            const createdDate = new Date(p.created_date);
+            const now = new Date();
+            return createdDate.getMonth() === now.getMonth() && createdDate.getFullYear() === now.getFullYear();
+          }).length, icon: NewUser, color: 'from-purple-500 to-purple-600' },
+          { label: 'Inactive', value: filteredPatients.filter(p => p.status === 'inactive').length, icon: UsersIcon, color: 'from-gray-400 to-gray-500' },
+        ].map((stat, index) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 + 0.2 }}
+          >
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-6">
+                <div className={`w-12 h-12 bg-gradient-to-br ${stat.color} rounded-xl flex items-center justify-center mb-4 shadow-lg`}>
+                  <stat.icon className="w-6 h-6 text-white" />
+                </div>
+                <p className="text-sm font-medium text-gray-600 mb-1">{stat.label}</p>
+                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* Modern Filters */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="bg-white rounded-2xl shadow-lg p-6 mb-6"
+      >
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="w-5 h-5 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Search patients by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-12 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="lg:w-56 h-12 rounded-xl border-gray-200">
+              <SelectValue placeholder="Filter by Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="discharged">Discharged</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </motion.div>
+
+      {/* Modern Results Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="bg-white rounded-2xl shadow-lg overflow-hidden"
+      >
+        <div className="flex justify-between items-center p-6 border-b border-gray-100">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">
+              Patient Directory ({filteredPatients.length})
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              {filteredPatients.length === 0 ? 'No patients found' :
+               `Showing ${Math.min(startIndex + 1, filteredPatients.length)} to ${Math.min(endIndex, filteredPatients.length)} of ${filteredPatients.length} patients`}
+            </p>
+          </div>
+          <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1 shadow-sm">
+            <Button
+              variant={viewMode === "cards" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("cards")}
+              className="rounded-lg"
+            >
+              <LayoutGrid className="w-4 h-4 mr-2" />
+              Cards
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("table")}
+              className="rounded-md"
+            >
+              <List className="w-4 h-4 mr-2" />
+              Table
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-4">
+          {viewMode === "cards" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {currentPatients.map((patient) => (
+                <PatientCard key={patient.id} patient={patient} onUpdate={loadPatients} />
+              ))}
+              {currentPatients.length === 0 && (
+                <div className="col-span-full text-center py-12">
+                  <p className="text-gray-500">No patients found</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="text-left py-3 px-4 font-semibold">Name</th>
+                        <th className="text-left py-3 px-4 font-semibold">Contact</th>
+                        <th className="text-left py-3 px-4 font-semibold">Care Level</th>
+                        <th className="text-left py-3 px-4 font-semibold">Status</th>
+                        <th className="text-left py-3 px-4 font-semibold">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {currentPatients.map((patient) => (
+                        <tr key={patient.id} className="hover:bg-gray-50">
+                          <td className="py-3 px-4 font-medium">{patient.first_name} {patient.last_name}</td>
+                          <td className="py-3 px-4">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Mail className="w-3 h-3 flex-shrink-0" />
+                                <span>{patient.email}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Phone className="w-3 h-3 flex-shrink-0" />
+                                <span>{patient.phone}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                             <Badge className={`${careLevelColors[patient.care_level]} capitalize`} variant="outline">
+                                {patient.care_level?.replace('_', ' ')}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            <Badge className={`${statusColors[patient.status]} capitalize`} variant="outline">
+                              {patient.status}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" title="View Details">
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" title="Edit">
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700" title="Delete">
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will permanently delete the patient record for "{patient.first_name} {patient.last_name}". This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeletePatient(patient.id)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {currentPatients.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="text-center py-12 text-gray-500">
+                            No patients found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="border-t border-gray-100 px-6">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredPatients.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setCurrentPage}
+            />
+          </div>
+        )}
+      </motion.div>
+
       <AddPatientDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
-        onPatientAdded={handlePatientAdded}
-        currentUser={currentUser}
+        onSubmit={handleAddPatient}
       />
-      <div className="p-6 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <div className="flex items-center gap-4">
-            <HeartHandshake className="w-8 h-8 text-blue-600" />
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Patients</h1>
-              <p className="text-gray-600">Manage your agency's patient records.</p>
-            </div>
-          </div>
-          <Button onClick={() => setIsAddDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Patient
-          </Button>
-        </div>
-
-        {/* Search and Filters */}
-        <div className="mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <Input
-              placeholder="Search patients by name, email, or phone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-
-        {/* Patient Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {paginatedPatients.map((patient) => (
-            <PatientCard
-              key={patient.id}
-              patient={patient}
-              onView={handleViewPatient}
-              onEdit={handleEditPatient}
-              onDelete={handleDeletePatient}
-            />
-          ))}
-        </div>
-
-        {filteredPatients.length === 0 && !isLoading && (
-          <div className="text-center py-16">
-            <HeartHandshake className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No patients found</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {searchTerm ? "Try adjusting your search." : "Get started by adding a new patient."}
-            </p>
-          </div>
-        )}
-
-        {/* Pagination */}
-        {filteredPatients.length > ITEMS_PER_PAGE && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={Math.ceil(filteredPatients.length / ITEMS_PER_PAGE)}
-            onPageChange={setCurrentPage}
-          />
-        )}
-      </div>
-    </>
+    </div>
   );
 }

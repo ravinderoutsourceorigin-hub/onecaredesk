@@ -56,6 +56,10 @@ import Home_new from "./Home_new";
 
 import AuthCallback from "./AuthCallback";
 
+import FormTemplates from "./FormTemplates";
+
+import FormViewer from "./FormViewer";
+
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
@@ -116,9 +120,21 @@ const PAGES = {
     
     AuthCallback: AuthCallback,
     
+    FormTemplates: FormTemplates,
+    
+    FormViewer: FormViewer,
+    
 }
 
 function _getCurrentPage(url) {
+    console.log('📍 _getCurrentPage called with:', url);
+    
+    // Handle root path explicitly
+    if (url === '/' || url === '') {
+        console.log('✅ Root path detected, returning Home_new');
+        return 'Home_new';
+    }
+    
     if (url.endsWith('/')) {
         url = url.slice(0, -1);
     }
@@ -128,7 +144,10 @@ function _getCurrentPage(url) {
     }
 
     const pageName = Object.keys(PAGES).find(page => page.toLowerCase() === urlLastPart.toLowerCase());
-    return pageName || Object.keys(PAGES)[0];
+    const result = pageName || 'Home_new'; // Default to Home_new instead of Dashboard
+    
+    console.log('📍 _getCurrentPage result:', { url, urlLastPart, pageName, result });
+    return result;
 }
 
 // Create a wrapper component that uses useLocation inside the Router context
@@ -136,13 +155,23 @@ function PagesContent() {
     const location = useLocation();
     const currentPage = _getCurrentPage(location.pathname);
     
+    // 🔍 DEBUG: Log routing info
+    console.log('🚀 PAGES CONTENT DEBUG:', {
+        pathname: location.pathname,
+        currentPage: currentPage,
+        isRoot: location.pathname === '/'
+    });
+    
     return (
         <Layout currentPageName={currentPage}>
             <Routes>            
+                {/* Home page at root */}
+                <Route path="/" element={<Home_new />} />
                 
-                    <Route path="/" element={<Dashboard />} />
+                {/* Auth/Login page */}
+                <Route path="/auth" element={<Auth />} />
                 
-                
+                {/* Dashboard and other protected routes */}
                 <Route path="/Dashboard" element={<Dashboard />} />
                 
                 <Route path="/Leads" element={<Leads />} />
@@ -183,7 +212,7 @@ function PagesContent() {
                 
                 <Route path="/ChangePassword" element={<ChangePassword />} />
                 
-                <Route path="/Auth" element={<Auth />} />
+                {/* Removed duplicate /Auth route - now at /auth */}
                 
                 <Route path="/ResetPassword" element={<ResetPassword />} />
                 
@@ -198,6 +227,10 @@ function PagesContent() {
                 <Route path="/Home_new" element={<Home_new />} />
                 
                 <Route path="/auth/callback" element={<AuthCallback />} />
+                
+                <Route path="/FormTemplates" element={<FormTemplates />} />
+                
+                <Route path="/FormViewer" element={<FormViewer />} />
                 
             </Routes>
         </Layout>

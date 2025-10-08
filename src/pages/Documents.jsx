@@ -74,7 +74,9 @@ export default function Documents() {
 
   const checkApiConfiguration = async () => {
     try {
-      const configs = await Configuration.filter({ key: "boldsign_client_id" });
+      // Use Configuration.list() instead of filter()
+      const allConfigs = await Configuration.list();
+      const configs = allConfigs.filter(c => c.key === "boldsign_client_id");
       const clientIdIsSet = configs.length > 0 && !!configs[0].value;
       const tokenIsSet = !!localStorage.getItem('boldsign_access_token');
       const isConfigured = clientIdIsSet && tokenIsSet;
@@ -101,7 +103,8 @@ export default function Documents() {
       await checkApiConfiguration();
       
       // Load local documents filtered by agency_id
-      const localDocs = await Document.filter({ agency_id: currentUser.agency_id }, "-created_date");
+      const allDocs = await Document.list();
+      const localDocs = allDocs.filter(doc => doc.agency_id === currentUser.agency_id);
       setLocalDocuments(localDocs);
     } catch (error) {
       console.error("Error loading data:", error);
@@ -181,7 +184,8 @@ export default function Documents() {
         console.error("Cannot clear documents: User agency ID is not available.");
         return;
       }
-      const allDocs = await Document.filter({ agency_id: currentUser.agency_id });
+      const allDocsData = await Document.list();
+      const allDocs = allDocsData.filter(doc => doc.agency_id === currentUser.agency_id);
       for (const doc of allDocs) {
         await Document.delete(doc.id);
       }

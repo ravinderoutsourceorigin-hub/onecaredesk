@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 import { AgencyInvitation } from "@/api/entities";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, formatDistanceToNow } from "date-fns";
-import { CheckCircle, XCircle, UsersRound, AlertTriangle, ExternalLink, Plus, RefreshCw, Crown, Shield, Users, Stethoscope, Mail, Clock, Trash2, Send, Check, Wrench, Search, Key } from "lucide-react";
+import { CheckCircle, XCircle, UsersRound, AlertTriangle, ExternalLink, Plus, RefreshCw, Crown, Shield, Users, Stethoscope, Mail, Clock, Trash2, Send, Check, Wrench, Search, Key, TrendingUp } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import InviteAgencyDialog from "@/components/admin/InviteAgencyDialog";
 import DebugInputDialog from "@/components/admin/DebugInputDialog";
@@ -22,16 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { 
-  getUserManagementData, 
-  createUser, 
-  updateUser, 
-  deleteUser, 
-  inviteUser,
-  resendInvitation,
-  cancelInvitation 
-} from "@/api/userManagement";
-import AddUserDialog from "@/components/admin/AddUserDialog";
+import { getUserManagementData } from "@/api/functions";
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -40,7 +32,6 @@ export default function UserManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [canViewAllUsers, setCanViewAllUsers] = useState(false);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [hasPermissionToManageUsers, setHasPermissionToManageUsers] = useState(false);
@@ -61,12 +52,12 @@ export default function UserManagement() {
       
       const response = await getUserManagementData({ agencyId: agencyIdForFilter });
 
-      if (response.success) {
+      if (response.data.success) {
           const { users: fetchedUsers, invitations: fetchedInvitations } = response.data;
           setUsers(fetchedUsers);
           setInvitations(fetchedInvitations || []);
       } else {
-          throw new Error(response.error || "Failed to fetch user data.");
+          throw new Error(response.data.error || "Failed to fetch user data.");
       }
     } catch (error) {
       console.error("Error loading user management data:", error);
@@ -104,13 +95,6 @@ export default function UserManagement() {
   useEffect(() => {
     loadInitialPermissionsAndData();
   }, [loadInitialPermissionsAndData]);
-
-  const handleUserAdded = (newUser) => {
-    // Add new user to the list
-    setUsers(prev => [newUser, ...prev]);
-    setSuccessMessage(`User ${newUser.full_name} created successfully!`);
-    setTimeout(() => setSuccessMessage(''), 3000);
-  };
 
   const getRoleBadgeVariant = (role) => {
     switch (role) {
@@ -223,15 +207,18 @@ export default function UserManagement() {
         setDebugResults(resultText);
         setSuccessMessage('Debug action completed successfully!');
         setTimeout(() => setSuccessMessage(''), 3000);
+        return response; // Return response for external handling if needed
       } else {
         setDebugResults(`❌ ${response.data?.message || 'Action failed'}`);
         setErrorMessage('Debug action failed');
         setTimeout(() => setErrorMessage(''), 5000);
+        throw new Error(response.data?.message || 'Action failed'); // Throw error for external handling
       }
     } catch (error) {
       setDebugResults(`❌ Error: ${error.message}`);
       setErrorMessage('Debug action failed: ' + error.message);
       setTimeout(() => setErrorMessage(''), 8000);
+      throw error; // Re-throw error for external handling
     } finally {
       setIsDebugLoading(false);
     }
@@ -262,6 +249,11 @@ export default function UserManagement() {
     );
   }
 
+  // Calculate stats
+  const activeUsers = users.filter(u => u.last_login_at);
+  const adminUsers = users.filter(u => ['super_admin', 'admin', 'agency_admin'].includes(u.role));
+  const agencyAdmins = users.filter(u => u.role === 'agency_admin');
+
   return (
     <>
       <InviteAgencyDialog
@@ -281,32 +273,84 @@ export default function UserManagement() {
         onSubmit={handleDebugSubmit}
         isLoading={isDebugLoading}
       />
-      <div className="p-6 max-w-5xl mx-auto">
-        {successMessage && (
-          <Alert className="mb-4 bg-green-50 border-green-200 text-green-800">
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>{successMessage}</AlertDescription>
-          </Alert>
-        )}
-        {errorMessage && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{errorMessage}</AlertDescription>
-          </Alert>
-        )}
-
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <UsersRound className="w-8 h-8 text-gray-700" />
+      <div className="p-6 max-w-7xl mx-auto">
+        {/* Modern Header with Gradient */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative mb-8 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-8 text-white shadow-2xl overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-black/10"></div>
+          <div className="relative flex items-center gap-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm shadow-xl">
+              <UsersRound className="h-8 w-8" />
+            </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-              <p className="text-gray-600">
+              <h1 className="text-3xl lg:text-4xl font-bold mb-2">
+                User Management
+              </h1>
+              <p className="text-white/90 text-base lg:text-lg">
                 {canViewAllUsers
                   ? 'Manage all users and agency invitations (Platform Admin View)'
                   : 'Manage users in your agency'
                 }
               </p>
             </div>
+          </div>
+        </motion.div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {[
+            { label: "Total Users", value: users.length, icon: UsersRound, color: "from-blue-500 to-blue-600" },
+            { label: "Active Users", value: activeUsers.length, icon: TrendingUp, color: "from-green-500 to-green-600" },
+            { label: "Admin Roles", value: adminUsers.length, icon: Crown, color: "from-purple-500 to-purple-600" },
+            { label: "Agency Admins", value: agencyAdmins.length, icon: Shield, color: "from-indigo-500 to-indigo-600" }
+          ].map((stat, index) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 + index * 0.1 }}
+              className="relative"
+            >
+              <div className="bg-white rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
+                    <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                  </div>
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${stat.color} shadow-lg`}>
+                    <stat.icon className="h-6 w-6 text-white" />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {successMessage && (
+          <Alert className="mb-4 bg-green-50 border-green-200 text-green-800 rounded-xl">
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>{successMessage}</AlertDescription>
+          </Alert>
+        )}
+        {errorMessage && (
+          <Alert variant="destructive" className="mb-4 rounded-xl">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="flex items-center justify-between mb-6 bg-white rounded-2xl shadow-lg p-6"
+        >
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Active Users ({users.length})</h3>
+            <p className="text-sm text-gray-500">Manage platform access and permissions</p>
           </div>
           <div className="flex gap-2">
             {currentUser?.email === 'ravinder.gade@gmail.com' && (
@@ -334,21 +378,51 @@ export default function UserManagement() {
               </Button>
             )}
             
-            <Button onClick={() => loadData(currentUser)} disabled={isLoading} variant="outline">
+            {/* Quick Reset for ravinder.nj@gmail.com */}
+            {currentUser?.email === 'ravinder.gade@gmail.com' && (
+              <Button
+                onClick={async () => {
+                  const newPassword = 'admin123'; // Temporary password
+                  try {
+                    // Call the debug action which handles both backend call and result display
+                    await runDebugAction('force-rehash-password', {
+                      username: 'ravinder.nj@gmail.com', // Target user to reset
+                      newPassword: newPassword
+                    });
+                    // runDebugAction already sets success/error messages internally, 
+                    // but we can add a specific one if needed
+                    if (!errorMessage) { // Only show this if runDebugAction didn't already set an error
+                        setSuccessMessage(`Password for ravinder.nj@gmail.com reset to: ${newPassword}`);
+                        setTimeout(() => setSuccessMessage(''), 10000);
+                    }
+                  } catch (error) {
+                    // runDebugAction already handles error message, so no need to duplicate here
+                    console.error("Failed to reset ravinder.nj@gmail.com password:", error);
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="bg-orange-50 border-orange-200 text-orange-700"
+              >
+                🔑 Reset ravinder.nj Password
+              </Button>
+            )}
+
+            <Button onClick={() => loadData(currentUser)} disabled={isLoading} variant="outline" className="rounded-xl border-gray-200">
               <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
           </div>
-        </div>
+        </motion.div>
 
         {['admin', 'super_admin'].includes(currentUser?.role) && (
-            <Card className="mb-6 bg-slate-50 border-slate-200">
+            <Card className="mb-6 bg-slate-50 border-slate-200 rounded-2xl shadow-lg">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-slate-800">
                         <Wrench className="h-5 w-5"/>
                         Admin Debugging Tools
                     </CardTitle>
-                    <CardDescription>Use these tools to diagnose login and user creation issues.</CardDescription>
+                    <CardDescription>Use these tools to diagnose login and password issues.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -420,12 +494,12 @@ export default function UserManagement() {
                             action: 'reset-user-password',
                             title: 'Reset User Password',
                             description: "This will generate a new temporary password for a user.",
-                            inputs: [{ name: 'username', label: 'Username', type: 'text' }],
+                            inputs: [{ name: 'username', label: 'Username or Email', type: 'text' }],
                             submitText: 'Reset Password'
                           })}
                           disabled={isDebugLoading}
                           variant="outline"
-                          className="justify-start text-left"
+                          className="justify-start text-left bg-red-50 border-red-200 text-red-700"
                         >
                           🔑 Reset User Password
                         </Button>
@@ -542,14 +616,14 @@ export default function UserManagement() {
         </Card>
 
         {canViewAllUsers && (
-          <Card className="mb-6">
-            <CardHeader>
+          <Card className="mb-6 rounded-2xl shadow-lg border-0">
+            <CardHeader className="border-b border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Agency Invitations</CardTitle>
                   <CardDescription>Invitations sent to new agency owners.</CardDescription>
                 </div>
-                <Button onClick={() => setIsInviteDialogOpen(true)}>
+                <Button onClick={() => setIsInviteDialogOpen(true)} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
                   <Plus className="w-4 h-4 mr-2"/>
                   Invite New Agency Owner
                 </Button>
@@ -633,8 +707,8 @@ export default function UserManagement() {
           </Card>
         )}
 
-        <Card>
-          <CardHeader>
+        <Card className="rounded-2xl shadow-lg border-0">
+          <CardHeader className="border-b border-gray-100">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>
@@ -649,16 +723,17 @@ export default function UserManagement() {
               </div>
               <Button
                 variant="outline"
-                onClick={() => setIsAddUserDialogOpen(true)}
-                className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                onClick={() => window.open('https://dashboard.base44.com', '_blank')}
+                className="text-blue-600 border-blue-200 hover:bg-blue-50 rounded-xl"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Add New User
+                Add Users via Dashboard
+                <ExternalLink className="w-4 h-4 ml-2" />
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-lg">
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -720,15 +795,16 @@ export default function UserManagement() {
                             <UsersRound className="w-12 h-12 text-gray-300" />
                             <div>
                               <p className="font-medium text-gray-600">No users found</p>
-                              <p className="text-sm text-gray-500">Create your first user to get started</p>
+                              <p className="text-sm text-gray-500">Add users through your Base44 dashboard</p>
                             </div>
                             <Button
                               variant="outline"
-                              onClick={() => setIsAddUserDialogOpen(true)}
+                              onClick={() => window.open('https://dashboard.base44.com', '_blank')}
                               className="text-blue-600 border-blue-200 hover:bg-blue-50"
                             >
                               <Plus className="w-4 h-4 mr-2" />
-                              Add First User
+                              Add Users
+                              <ExternalLink className="w-4 h-4 ml-2" />
                             </Button>
                           </div>
                         </TableCell>
@@ -741,13 +817,6 @@ export default function UserManagement() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Add User Dialog */}
-      <AddUserDialog
-        isOpen={isAddUserDialogOpen}
-        onClose={() => setIsAddUserDialogOpen(false)}
-        onUserAdded={handleUserAdded}
-      />
     </>
   );
 }

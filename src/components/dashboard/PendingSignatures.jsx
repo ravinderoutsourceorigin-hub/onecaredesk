@@ -22,8 +22,8 @@ export default function PendingSignatures() {
 
   const loadPendingSignatures = async () => {
     try {
-      const allRequests = await SignatureRequest.list("-created_date", 50);
-      const pending = allRequests.filter(req => ['draft', 'sent', 'viewed'].includes(req.status));
+      const allRequests = await SignatureRequest.list();
+      const pending = allRequests.filter(req => ['draft', 'sent', 'viewed'].includes(req.status)).slice(0, 50);
       setSignatures(pending);
     } catch (error) {
       console.error("Error loading pending signatures:", error);

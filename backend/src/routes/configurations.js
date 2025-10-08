@@ -6,7 +6,7 @@ const router = express.Router();
 // Get all configurations
 router.get('/', async (req, res) => {
   try {
-    const result = await query('SELECT * FROM configurations ORDER BY created_at DESC');
+    const result = await query('SELECT * FROM configurations ORDER BY created_date DESC');
     res.json({ configurations: result.rows, total: result.rows.length });
   } catch (error) {
     console.error('Get configurations error:', error);
@@ -19,7 +19,7 @@ router.post('/', async (req, res) => {
   try {
     const { key, value, description } = req.body;
     const result = await query(
-      'INSERT INTO configurations (key, value, description, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, description = $3, updated_at = NOW() RETURNING *',
+      'INSERT INTO configurations (key, value, description, created_date, updated_date) VALUES ($1, $2, $3, NOW(), NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, description = $3, updated_date = NOW() RETURNING *',
       [key, value, description]
     );
     res.json({ configuration: result.rows[0] });

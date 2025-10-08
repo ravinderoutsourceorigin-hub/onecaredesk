@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Lead } from "@/api/entities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
 import {
   Plus,
   Search,
@@ -14,7 +15,11 @@ import {
   Mail,
   Edit,
   Eye,
-  Trash2
+  Trash2,
+  TrendingUp,
+  Users as UsersIcon,
+  UserPlus,
+  CheckCircle2,
 } from "lucide-react";
 import {
   Select,
@@ -76,42 +81,26 @@ export default function Leads() {
     loadCurrentUser();
   }, []);
 
-  useEffect(() => {
-    // Only load leads after we have the current user's info
-    if (currentUser) {
-      loadLeads();
-    } else if (currentUser === null) {
-      // If currentUser is explicitly null (meaning user data was checked and not found),
-      // we should not continue loading and ensure isLoading is false.
-      // This covers the case where localStorage might be empty or invalid.
-      setIsLoading(false);
+  const loadLeads = useCallback(async () => {
+    if (!currentUser?.agency_id) { // Don't load if no agency ID is available for the current user
+      console.warn("Cannot load leads: No agency ID found for current user.");
+      setIsLoading(false); // Ensure loading state is reset even if no leads are loaded
+      return;
     }
-  }, [currentUser]); // Depend on currentUser
-
-  useEffect(() => {
-    filterLeads();
-  }, [leads, searchTerm, statusFilter]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
-
-  const loadLeads = async () => {
     try {
       setIsLoading(true);
-      // Use list method instead of filter
-      const response = await Lead.list();
-      const data = response.leads || response || [];
-      setLeads(data);
+      // CORE MULTI-TENANCY CHANGE: Filter leads by the current user's agency_id
+      const data = await Lead.filter({ agency_id: currentUser.agency_id }, "-created_date");
+      setLeads(data || []);
     } catch (error) {
       console.error("Error loading leads:", error);
       setLeads([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentUser]); // Depend on currentUser to re-create if user changes
 
-  const filterLeads = () => {
+  const filterLeads = useCallback(() => {
     let filtered = leads;
 
     if (searchTerm) {
@@ -127,19 +116,44 @@ export default function Leads() {
     }
 
     setFilteredLeads(filtered);
-  };
+  }, [leads, searchTerm, statusFilter]);
+
+  useEffect(() => {
+    // Only load leads after we have the current user's info
+    if (currentUser) {
+      loadLeads();
+    } else if (currentUser === null) {
+      // If currentUser is explicitly null (meaning user data was checked and not found),
+      // we should not continue loading and ensure isLoading is false.
+      // This covers the case where localStorage might be empty or invalid.
+      setIsLoading(false);
+    }
+  }, [currentUser, loadLeads]); // Depend on currentUser and the memoized loadLeads function
+
+  useEffect(() => {
+    filterLeads();
+  }, [filterLeads]); // Depend on the memoized filterLeads function
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   const handleAddLead = async (leadData) => {
+    if (!currentUser?.agency_id) {
+      console.error("Cannot add lead: no agency ID found for current user.");
+      return;
+    }
     try {
-      // Backend automatically assigns agency_id from available agencies
-      // so we don't need to check currentUser.agency_id for now
-      console.log('🚀 Creating lead with data:', leadData);
-      await Lead.create(leadData);
+      // CORE MULTI-TENANCY CHANGE: Add agency_id to the new lead
+      const dataToCreate = {
+        ...leadData,
+        agency_id: currentUser.agency_id,
+      };
+      await Lead.create(dataToCreate);
       setIsAddDialogOpen(false);
       loadLeads();
-      console.log('✅ Lead created successfully');
     } catch (error) {
-      console.error("❌ Error adding lead:", error);
+      console.error("Error adding lead:", error);
     }
   };
   
@@ -190,69 +204,126 @@ export default function Leads() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">Lead Management</h1>
-          <p className="text-gray-600 mt-1">
-            {currentUser?.agency_id ? 'Manage leads for your agency' : 'No agency information available. Please check your user session.'}
-          </p>
+      {/* Modern Header with Gradient */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-8 mb-8 shadow-2xl"
+      >
+        <div className="relative flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-xl">
+              <UsersIcon className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl lg:text-4xl font-bold text-white">Lead Management</h1>
+              <p className="text-blue-100 mt-1">
+                {currentUser?.agency_id ? 'Manage and convert your leads' : 'No agency information available'}
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={() => setIsAddDialogOpen(true)}
+            className="bg-white text-blue-600 hover:bg-blue-50 shadow-lg hover:shadow-xl transition-all"
+            size="lg"
+            disabled={!currentUser?.agency_id}
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add New Lead
+          </Button>
         </div>
-        <Button
-          onClick={() => setIsAddDialogOpen(true)}
-          className="bg-blue-500 hover:bg-blue-600"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add New Lead
-        </Button>
-      </div>
+      </motion.div>
 
-      {/* Filters */}
-      <div className="flex flex-col lg:flex-row gap-4 mb-6">
-        <div className="flex-1 relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <Input
-            placeholder="Search leads..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+      {/* Stats Cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+      >
+        {[
+          { label: 'Total Leads', value: filteredLeads.length, icon: UsersIcon, color: 'from-blue-500 to-blue-600' },
+          { label: 'New Leads', value: filteredLeads.filter(l => l.status === 'new').length, icon: UserPlus, color: 'from-indigo-500 to-indigo-600' },
+          { label: 'Qualified', value: filteredLeads.filter(l => l.status === 'qualified').length, icon: TrendingUp, color: 'from-purple-500 to-purple-600' },
+          { label: 'Converted', value: filteredLeads.filter(l => l.status === 'converted').length, icon: CheckCircle2, color: 'from-green-500 to-green-600' },
+        ].map((stat, index) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 + 0.2 }}
+          >
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-6">
+                <div className={`w-12 h-12 bg-gradient-to-br ${stat.color} rounded-xl flex items-center justify-center mb-4 shadow-lg`}>
+                  <stat.icon className="w-6 h-6 text-white" />
+                </div>
+                <p className="text-sm font-medium text-gray-600 mb-1">{stat.label}</p>
+                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* Modern Filters */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="bg-white rounded-2xl shadow-lg p-6 mb-6"
+      >
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex-1 relative">
+            <Search className="w-5 h-5 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Input
+              placeholder="Search leads by name, email, or phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-12 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="lg:w-56 h-12 rounded-xl border-gray-200">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All Status">All Status</SelectItem>
+              <SelectItem value="new">New</SelectItem>
+              <SelectItem value="contacted">Contacted</SelectItem>
+              <SelectItem value="qualified">Qualified</SelectItem>
+              <SelectItem value="assessment_scheduled">Assessment Scheduled</SelectItem>
+              <SelectItem value="converted">Converted</SelectItem>
+              <SelectItem value="closed">Closed</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="lg:w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All Status">All Status</SelectItem>
-            <SelectItem value="new">New</SelectItem>
-            <SelectItem value="contacted">Contacted</SelectItem>
-            <SelectItem value="qualified">Qualified</SelectItem>
-            <SelectItem value="assessment_scheduled">Assessment Scheduled</SelectItem>
-            <SelectItem value="converted">Converted</SelectItem>
-            <SelectItem value="closed">Closed</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      </motion.div>
 
-      {/* Results Section */}
-      <div className="border border-gray-200 rounded-lg bg-white">
+      {/* Modern Results Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="bg-white rounded-2xl shadow-lg overflow-hidden"
+      >
         {/* Header with View Toggle */}
-        <div className="flex justify-between items-center p-4 border-b border-gray-200">
+        <div className="flex justify-between items-center p-6 border-b border-gray-100">
           <div>
-            <h3 className="font-medium text-gray-900">
+            <h3 className="text-lg font-semibold text-gray-900">
               Lead Directory ({filteredLeads.length})
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 mt-1">
               {filteredLeads.length === 0 ? 'No leads found' :
                `Showing ${Math.min(startIndex + 1, filteredLeads.length)} to ${Math.min(endIndex, filteredLeads.length)} of ${filteredLeads.length} leads`}
             </p>
           </div>
-          <div className="flex rounded-lg border bg-gray-50 p-1">
+          <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1 shadow-sm">
             <Button
               variant={viewMode === "cards" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("cards")}
-              className="rounded-md"
+              className="rounded-lg"
             >
               <LayoutGrid className="w-4 h-4 mr-2" />
               Cards
@@ -380,7 +451,7 @@ export default function Leads() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="border-t border-gray-200 px-4">
+          <div className="border-t border-gray-100 px-6">
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -390,7 +461,7 @@ export default function Leads() {
             />
           </div>
         )}
-      </div>
+      </motion.div>
 
       <AddLeadDialog
         open={isAddDialogOpen}

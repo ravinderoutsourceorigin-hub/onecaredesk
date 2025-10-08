@@ -17,6 +17,8 @@ import appointmentRoutes from './routes/appointments.js';
 import configurationRoutes from './routes/configurations.js';
 import taskRoutes from './routes/tasks.js';
 import boldSignRoutes from './routes/boldsign.js';
+import formTemplateRoutes from './routes/form-templates.js';
+import integrationRoutes from './routes/integrations.js';
 
 // Load environment variables
 dotenv.config();
@@ -74,6 +76,8 @@ app.use('/api/appointments', authenticateToken, appointmentRoutes);
 app.use('/api/configurations', authenticateToken, configurationRoutes);
 app.use('/api/tasks', authenticateToken, taskRoutes);
 app.use('/api/boldsign', authenticateToken, boldSignRoutes);
+app.use('/api/form-templates', authenticateToken, formTemplateRoutes);
+app.use('/api/integrations', authenticateToken, integrationRoutes);
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));

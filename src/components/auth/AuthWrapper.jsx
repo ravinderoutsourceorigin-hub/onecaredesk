@@ -6,10 +6,40 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { createUser, checkUserExists } from '@/api/userManagement';
 
+// Define public pages that don't require authentication
+const PUBLIC_PATHS = [
+  '/',
+  '/auth',
+  '/Home_new',
+  '/Home',
+  '/Landing',
+  '/Features',
+  '/Pricing',
+  '/About',
+  '/Contact',
+  '/ResetPassword',
+  '/EmailVerification',
+  '/InvitationAcceptance',
+  '/ServiceAgreement',
+  '/auth/callback'
+];
+
 export default function AuthWrapper({ children }) {
   const { login, logout, isAuthenticated, isLoading, user, getToken, error } = useKindeAuth();
   const [authError, setAuthError] = useState(null);
   const [localUser, setLocalUser] = useState(null);
+
+  // Check if current path is public (using window.location since we're outside Router)
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+  const isPublicPath = PUBLIC_PATHS.includes(currentPath);
+  
+  // 🔍 DEBUG
+  console.log('🔐 AUTH WRAPPER DEBUG:', {
+    pathname: currentPath,
+    isPublicPath,
+    isAuthenticated,
+    isLoading
+  });
 
   // Function to sync Kinde user with our database
   const syncUserWithDatabase = async (kindeUser) => {
@@ -176,40 +206,52 @@ export default function AuthWrapper({ children }) {
     );
   }
 
+  // If it's a public path, render children without auth check
+  if (isPublicPath) {
+    console.log('✅ Public path, rendering without auth check');
+    return children;
+  }
+
+  // For protected paths, check authentication
   if (!isAuthenticated || !localUser) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Shield className="w-8 h-8 text-blue-600" />
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-2xl border-0">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+              <Shield className="w-10 h-10 text-white" />
             </div>
-            <CardTitle className="text-2xl">Welcome to CareConnect</CardTitle>
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              Welcome to OneCare Desk
+            </CardTitle>
           </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <p className="text-gray-600">
-              Please sign in to access your healthcare portal.
+          <CardContent className="text-center space-y-6 pb-8">
+            <p className="text-gray-600 text-lg">
+              Please sign in to access your dashboard
             </p>
             
             {authError && (
-              <Alert className="mb-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
+              <Alert className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
                   Authentication Error: {authError}
                   <br />
-                  <small className="text-gray-500">
-                    Please check your Kinde application configuration.
+                  <small className="text-red-600">
+                    Please check your configuration or contact support.
                   </small>
                 </AlertDescription>
               </Alert>
             )}
             
-            <Button onClick={handleLogin} className="w-full bg-blue-600 hover:bg-blue-700">
-              Sign In with Google
+            <Button 
+              onClick={handleLogin} 
+              className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-300"
+            >
+              Sign In to Continue
             </Button>
             
-            <div className="text-xs text-gray-500 mt-4">
-              Powered by Kinde Authentication
+            <div className="text-sm text-gray-500 pt-4 border-t border-gray-200">
+              Secure authentication powered by Kinde
             </div>
           </CardContent>
         </Card>

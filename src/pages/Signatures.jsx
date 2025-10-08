@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 import { SignatureRequest } from "@/api/entities";
 import { User } from "@/api/entities"; // Keep this import as User might be used elsewhere or for type definitions
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,8 @@ import {
   List,
   Download,
   Trash,
-  Loader2 // Added Loader2 icon for refresh button
+  Loader2,
+  TrendingUp // Added Loader2 icon for refresh button
 } from "lucide-react";
 import {
   Select,
@@ -53,8 +55,7 @@ export default function Signatures() {
   const [filteredRequests, setFilteredRequests] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [providerFilter, setProviderFilter] = useState("all");
-  const [viewMode, setViewMode] = useState("cards");
+  const [viewMode, setViewMode] = useState("table"); // Set table as default
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -79,21 +80,7 @@ export default function Signatures() {
     loadCurrentUser();
   }, []);
 
-  useEffect(() => {
-    if (currentUser) {
-      loadSignatureRequests();
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    filterRequests();
-  }, [signatureRequests, searchTerm, statusFilter, providerFilter]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, statusFilter, providerFilter]);
-
-  const loadSignatureRequests = async (showLoading = true) => {
+  const loadSignatureRequests = useCallback(async (showLoading = true) => {
     if (!currentUser?.agency_id) {
       if (showLoading) setIsLoading(false);
       return;
@@ -108,9 +95,15 @@ export default function Signatures() {
     } finally {
       if (showLoading) setIsLoading(false);
     }
-  };
+  }, [currentUser]); // currentUser is a dependency
 
-  const filterRequests = () => {
+  useEffect(() => {
+    if (currentUser) {
+      loadSignatureRequests();
+    }
+  }, [currentUser, loadSignatureRequests]); // loadSignatureRequests is now a stable function
+
+  const filterRequests = useCallback(() => {
     let filtered = signatureRequests;
 
     if (searchTerm) {
@@ -126,12 +119,16 @@ export default function Signatures() {
       filtered = filtered.filter(request => request.status === statusFilter);
     }
 
-    if (providerFilter !== "all") {
-      filtered = filtered.filter(request => request.provider === providerFilter);
-    }
-
     setFilteredRequests(filtered);
-  };
+  }, [signatureRequests, searchTerm, statusFilter]); // Dependencies for filterRequests
+
+  useEffect(() => {
+    filterRequests();
+  }, [filterRequests]); // filterRequests is now a stable function
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   const handleCreateRequest = (requestData) => {
     setIsCreateDialogOpen(false);
@@ -225,13 +222,8 @@ export default function Signatures() {
 
   const getProviderInfo = (provider) => {
     switch (provider) {
-      case 'boldsign': return { name: 'BoldSign', color: 'bg-blue-100 text-blue-800' };
       case 'jotform': return { name: 'JotForm Sign', color: 'bg-orange-100 text-orange-800' };
-      case 'fillout': return { name: 'Fillout', color: 'bg-purple-100 text-purple-800' };
-      case 'hellosign': return { name: 'HelloSign', color: 'bg-green-100 text-green-800' };
-      case 'docusign': return { name: 'DocuSign', color: 'bg-indigo-100 text-indigo-800' };
-      case 'adobe_sign': return { name: 'Adobe Sign', color: 'bg-red-100 text-red-800' };
-      default: return { name: 'Unknown', color: 'bg-gray-100 text-gray-800' };
+      default: return { name: 'JotForm', color: 'bg-gray-100 text-gray-800' };
     }
   };
 
@@ -239,14 +231,75 @@ export default function Signatures() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
-        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">E-Signatures</h1>
+      {/* Modern Header with Gradient */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative mb-8 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-8 text-white shadow-2xl overflow-hidden"
+      >
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="relative flex items-center gap-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm shadow-xl">
+            <FileSignature className="h-8 w-8" />
+          </div>
+          <div>
+            <h1 className="text-3xl lg:text-4xl font-bold mb-2">
+              E-Signature Requests
+            </h1>
+            <p className="text-white/90 text-base lg:text-lg">
+              Manage and track all electronic signature requests
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {[
+          { label: "Total Documents", value: stats.total, icon: FileSignature, color: "from-blue-500 to-blue-600" },
+          { label: "Pending Signatures", value: stats.pending, icon: Send, color: "from-amber-500 to-amber-600" },
+          { label: "Completed", value: stats.completed, icon: CheckCircle, color: "from-green-500 to-green-600" },
+          { label: "Expired", value: stats.expired, icon: XCircle, color: "from-red-500 to-red-600" }
+        ].map((stat, index) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 + index * 0.1 }}
+            className="relative"
+          >
+            <div className="bg-white rounded-xl p-6 border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
+                  <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                </div>
+                <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${stat.color} shadow-lg`}>
+                  <stat.icon className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Header Controls */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4 bg-white rounded-2xl shadow-lg p-6"
+      >
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-gray-900">Signature Requests ({filteredRequests.length})</h3>
+          <p className="text-sm text-gray-600">Track document signing progress and status</p>
+        </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
             onClick={() => loadSignatureRequests(true)}
             disabled={isLoading}
+            className="rounded-xl border-gray-200"
           >
             {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RotateCw className="w-4 h-4 mr-2" />}
             Refresh
@@ -254,16 +307,16 @@ export default function Signatures() {
           {signatureRequests.length > 0 && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" className="text-red-600 border-red-300 hover:bg-red-50">
+                <Button variant="outline" className="text-red-600 border-red-300 hover:bg-red-50 rounded-xl">
                   <Trash className="w-4 h-4 mr-2" />
                   Delete All
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete All Signature Requests?</AlertDialogTitle>
+                  <AlertDialogTitle>Delete All E-Sign Requests?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete all {signatureRequests.length} signature requests in your agency. This action cannot be undone.
+                    This will permanently delete all {signatureRequests.length} e-sign requests in your agency. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -280,17 +333,18 @@ export default function Signatures() {
           )}
           <Button
             onClick={() => setIsCreateDialogOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
             disabled={!currentUser?.agency_id}
           >
             <Plus className="w-4 h-4 mr-2" />
-            New Signature Request
+            New E-Sign Request
           </Button>
         </div>
-      </div>
+      </motion.div>
 
+      {/* Remove old summary cards since we have stats at top */}
       {/* Summary Cards - Only show if there's data */}
-      {signatureRequests.length > 0 && (
+      {false && signatureRequests.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0">
             <CardContent className="p-4">
@@ -340,18 +394,18 @@ export default function Signatures() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col lg:flex-row gap-4 mb-6">
+      <div className="flex flex-col lg:flex-row gap-4 mb-6 bg-white rounded-2xl shadow-lg p-6">
         <div className="flex-1 relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <Search className="w-5 h-5 absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
           <Input
             placeholder="Search requests by name, email, or document..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-12 h-12 rounded-xl border-gray-200"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="lg:w-48">
+          <SelectTrigger className="lg:w-56 h-12 rounded-xl border-gray-200">
             <SelectValue placeholder="Filter by Status" />
           </SelectTrigger>
           <SelectContent>
@@ -365,40 +419,31 @@ export default function Signatures() {
             <SelectItem value="expired">Expired</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={providerFilter} onValueChange={setProviderFilter}>
-          <SelectTrigger className="lg:w-48">
-            <SelectValue placeholder="Filter by Provider" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Providers</SelectItem>
-            <SelectItem value="boldsign">BoldSign</SelectItem>
-            <SelectItem value="jotform">JotForm Sign</SelectItem>
-            <SelectItem value="fillout">Fillout</SelectItem>
-            <SelectItem value="hellosign">HelloSign</SelectItem>
-            <SelectItem value="docusign">DocuSign</SelectItem>
-            <SelectItem value="adobe_sign">Adobe Sign</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Results Section */}
-      <div className="border border-gray-200 rounded-lg bg-white">
-        <div className="flex justify-between items-center p-4 border-b border-gray-200">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        className="bg-white rounded-2xl shadow-lg overflow-hidden"
+      >
+        <div className="flex justify-between items-center p-6 border-b border-gray-100">
           <div>
-            <h3 className="font-medium text-gray-900">
-              Signature Requests ({filteredRequests.length})
+            <h3 className="text-lg font-semibold text-gray-900">
+              E-Sign Requests ({filteredRequests.length})
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 mt-1">
               {filteredRequests.length === 0 ? 'No requests found' :
                `Showing ${Math.min(startIndex + 1, filteredRequests.length)} to ${Math.min(endIndex, filteredRequests.length)} of ${filteredRequests.length} requests`}
             </p>
           </div>
-          <div className="flex rounded-lg border bg-gray-50 p-1">
+          <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1">
             <Button
               variant={viewMode === "cards" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("cards")}
-              className="rounded-md"
+              className="rounded-lg"
             >
               <LayoutGrid className="w-4 h-4 mr-2" />
               Cards
@@ -407,7 +452,7 @@ export default function Signatures() {
               variant={viewMode === "table" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("table")}
-              className="rounded-md"
+              className="rounded-lg"
             >
               <List className="w-4 h-4 mr-2" />
               Table
@@ -415,25 +460,25 @@ export default function Signatures() {
           </div>
         </div>
 
-        <div className="p-4">
+        <div className="p-6">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {Array(6).fill(0).map((_, i) => (
-                <div key={i} className="h-56 bg-gray-100 rounded-lg animate-pulse" />
+                <div key={i} className="h-56 bg-gray-100 rounded-2xl animate-pulse" />
               ))}
             </div>
           ) : filteredRequests.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <FileSignature className="w-16 h-16 text-gray-300 mb-4" />
-              <p className="text-gray-600 font-medium mb-2">No signature requests found</p>
-              <p className="text-gray-500 mb-4">Create your first signature request to get started</p>
+              <p className="text-gray-600 font-medium mb-2">No e-sign requests found</p>
+              <p className="text-gray-500 mb-4">Create your first e-sign request to get started</p>
               <Button
                 onClick={() => setIsCreateDialogOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                 disabled={!currentUser?.agency_id}
               >
                 <Plus className="w-4 h-4 mr-2" />
-                New Signature Request
+                New E-Sign Request
               </Button>
             </div>
           ) : viewMode === "cards" ? (
@@ -456,7 +501,6 @@ export default function Signatures() {
                   <tr>
                     <th className="text-left py-3 px-4 font-semibold">Document</th>
                     <th className="text-left py-3 px-4 font-semibold">Recipient</th>
-                    <th className="text-left py-3 px-4 font-semibold">Provider</th>
                     <th className="text-left py-3 px-4 font-semibold">Status</th>
                     <th className="text-left py-3 px-4 font-semibold">Date Sent</th>
                     <th className="text-left py-3 px-4 font-semibold">Actions</th>
@@ -467,11 +511,6 @@ export default function Signatures() {
                     <tr key={request.id} className="hover:bg-gray-50">
                       <td className="py-3 px-4 font-medium">{request.title}</td>
                       <td className="py-3 px-4">{request.recipients?.[0]?.name || 'N/A'}</td>
-                      <td className="py-3 px-4 capitalize">
-                        <Badge className={`${getProviderInfo(request.provider).color} text-xs`} >
-                            {getProviderInfo(request.provider).name}
-                        </Badge>
-                      </td>
                       <td className="py-3 px-4">
                         <Badge className={statusColors[request.status]} variant="outline">
                           {request.status}
@@ -503,7 +542,7 @@ export default function Signatures() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="border-t border-gray-200 px-4">
+          <div className="border-t border-gray-100 px-6">
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -513,7 +552,7 @@ export default function Signatures() {
             />
           </div>
         )}
-      </div>
+      </motion.div>
 
       <CreateSignatureRequestDialog
         open={isCreateDialogOpen}

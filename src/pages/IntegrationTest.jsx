@@ -84,7 +84,8 @@ export default function IntegrationTest() {
       proxy: { status: 'loading' }
     });
 
-    const config = await Configuration.filter({ key: 'jotform_api_key' });
+    const allConfigs = await Configuration.list();
+    const config = allConfigs.filter(c => c.key === 'jotform_api_key');
     const apiKey = config.length > 0 ? config[0].value : null;
 
     if (!apiKey) {

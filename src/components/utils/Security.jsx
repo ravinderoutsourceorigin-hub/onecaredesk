@@ -47,23 +47,34 @@ export const checkPermission = async (user, requiredPermission) => {
     return false;
   }
 
-  // Fetch all roles for the current user from the new RoleAssignment entity
-  const assignments = await RoleAssignment.filter({ user_email: user.email });
+  try {
+    // Fetch all roles for the current user from the new RoleAssignment entity
+    const assignmentsResult = await RoleAssignment.filter({ user_email: user.email });
+    
+    // Handle both array and object responses from Base44
+    const assignments = Array.isArray(assignmentsResult) 
+      ? assignmentsResult 
+      : (assignmentsResult?.data || assignmentsResult?.items || []);
 
-  if (assignments.length > 0) {
-    // New Role System: Check permissions based on all assigned roles.
-    for (const assignment of assignments) {
-      const userPermissions = rolePermissions[assignment.role] || [];
-      if (userPermissions.includes('*') || userPermissions.includes(requiredPermission)) {
-        return true; // Permission granted by one of the roles
-      }
-      // Special case for agency-wide permissions
-      if (userPermissions.includes('*_within_agency') && assignment.agency_id === user.agency_id) {
-        return true;
+    if (assignments.length > 0) {
+      // New Role System: Check permissions based on all assigned roles.
+      for (const assignment of assignments) {
+        const userPermissions = rolePermissions[assignment.role] || [];
+        if (userPermissions.includes('*') || userPermissions.includes(requiredPermission)) {
+          return true; // Permission granted by one of the roles
+        }
+        // Special case for agency-wide permissions
+        if (userPermissions.includes('*_within_agency') && assignment.agency_id === user.agency_id) {
+          return true;
+        }
       }
     }
-  } else if (user.role) {
-    // Fallback to the old system if no roles are assigned in the new table
+  } catch (error) {
+    console.warn('Error checking role assignments:', error);
+  }
+  
+  // Fallback to the old system if no roles are assigned or error occurred
+  if (user.role) {
     const userPermissions = rolePermissions[user.role] || [];
     if (userPermissions.includes('*') || userPermissions.includes(requiredPermission)) {
       return true;

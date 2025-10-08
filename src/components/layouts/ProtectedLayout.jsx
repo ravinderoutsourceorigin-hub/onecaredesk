@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useKindeAuth } from '@kinde-oss/kinde-auth-react';
 import { createPageUrl } from "@/utils";
 import { Agency } from "@/api/entities";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Home,
   Users,
@@ -15,10 +16,11 @@ import {
   Settings,
   LogOut,
   Menu,
-  Building2, // This was used for Agencies
-  UserPlus, // This was used for User Management
+  Building2,
+  UserPlus,
   User as UserIcon,
   ChevronUp,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -158,6 +160,7 @@ export default function ProtectedLayout({ children, currentPageName }) {
         { name: "Caregivers", icon: ClipboardList, href: createPageUrl('Caregivers') },
         { name: "Calendar", icon: Calendar, href: createPageUrl('Calendar') },
         { name: "Documents", icon: FileText, href: createPageUrl('Documents') },
+        { name: "Form Templates", icon: FileText, href: createPageUrl('FormTemplates') },
         { name: "Signatures", icon: FileSignature, href: createPageUrl('Signatures') },
         { name: "Settings", icon: Settings, href: createPageUrl('Settings') }
     ];
@@ -166,11 +169,18 @@ export default function ProtectedLayout({ children, currentPageName }) {
   if (isLoading) {
     console.log('⏳ PROTECTED LAYOUT DEBUG - Showing loading screen');
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading session...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
+            <Sparkles className="w-6 h-6 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+          </div>
+          <p className="mt-6 text-gray-600 font-medium">Loading your workspace...</p>
+        </motion.div>
       </div>
     );
   }
@@ -178,7 +188,7 @@ export default function ProtectedLayout({ children, currentPageName }) {
   if (!user) {
     console.log('❌ PROTECTED LAYOUT DEBUG - No user found, showing please log in message');
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600">Please log in to continue</p>
         </div>
@@ -191,72 +201,85 @@ export default function ProtectedLayout({ children, currentPageName }) {
   const navigationItems = getNavigationItems();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:flex lg:w-56 lg:flex-col lg:fixed lg:inset-y-0">
-        <div className="flex-1 flex flex-col min-h-0 bg-black shadow-xl">
-          <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
-            <div className="flex items-center flex-shrink-0 px-3">
-              <div className="flex items-start gap-2">
-                <div className="w-7 h-7 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
-                  <Home className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-base font-bold text-white">OneCareDesk</h1>
-                  {agencyInfo && (
-                    <p className="text-xs text-amber-300 font-semibold truncate max-w-[140px]">{agencyInfo.name}</p>
-                  )}
-                  {user.agency_id && !agencyInfo && (
-                    <p className="text-xs text-gray-400 truncate max-w-[140px]">Loading agency...</p>
-                  )}
-                </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Desktop Sidebar - MODERN GRADIENT DESIGN */}
+      <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 z-50">
+        <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 shadow-2xl backdrop-blur-xl">
+          {/* Logo Area */}
+          <div className="flex-shrink-0 px-6 py-6 border-b border-white/10">
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-3"
+            >
+              <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center shadow-lg">
+                <Sparkles className="w-5 h-5 text-white" />
               </div>
-            </div>
-            <nav className="mt-6 flex-1 px-2 space-y-1">
-              {navigationItems.map((item) => {
-                const isActive = location.pathname === item.href;
-                return (
+              <div>
+                <h1 className="text-xl font-bold text-white">OneCareDesk</h1>
+                {agencyInfo && (
+                  <p className="text-xs text-blue-100 font-medium truncate max-w-[160px]">{agencyInfo.name}</p>
+                )}
+                {user.agency_id && !agencyInfo && (
+                  <p className="text-xs text-blue-200 truncate max-w-[160px]">Loading agency...</p>
+                )}
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+            {navigationItems.map((item, index) => {
+              const isActive = location.pathname === item.href;
+              return (
+                <motion.div
+                  key={item.name}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                >
                   <Link
-                    key={item.name}
                     to={item.href}
-                    className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
+                    className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${
                       isActive
-                        ? 'bg-blue-700 text-white'
-                        : 'text-gray-300 hover:bg-gray-900 hover:text-white'
+                        ? 'bg-white text-blue-600 shadow-lg'
+                        : 'text-white/80 hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     <item.icon
-                      className={`mr-2 flex-shrink-0 h-4 w-4 ${
-                        isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'
+                      className={`mr-3 flex-shrink-0 h-5 w-5 transition-transform group-hover:scale-110 ${
+                        isActive ? 'text-blue-600' : 'text-white/70'
                       }`}
                     />
                     {item.name}
                   </Link>
-                );
-              })}
-            </nav>
-          </div>
-          <div className="flex-shrink-0 border-t border-gray-700 p-2">
+                </motion.div>
+              );
+            })}
+          </nav>
+
+          {/* User Profile */}
+          <div className="flex-shrink-0 border-t border-white/10 p-4">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="ghost" className="w-full text-left justify-between items-center text-white p-2 hover:bg-gray-900">
-                    <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center">
-                            <UserIcon className="w-4 h-4 text-white" />
+                <Button variant="ghost" className="w-full text-left justify-between items-center text-white p-3 hover:bg-white/10 rounded-xl transition-all">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shadow-lg">
+                            <UserIcon className="w-5 h-5 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold truncate">{user.full_name}</p>
-                            <p className="text-xs text-gray-400 capitalize truncate">{user.role?.replace('_', ' ')}</p>
+                            <p className="text-sm font-semibold truncate">{user.full_name}</p>
+                            <p className="text-xs text-blue-100 capitalize truncate">{user.role?.replace('_', ' ')}</p>
                         </div>
                     </div>
-                    <ChevronUp className="w-3 h-3" />
+                    <ChevronUp className="w-4 h-4" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent side="top" align="start" className="w-52 bg-gray-900 border-gray-700 text-white p-2 mb-2">
+              <PopoverContent side="top" align="start" className="w-56 bg-white border-gray-200 shadow-xl p-2 mb-2">
                 <Button
                     onClick={handleLogout}
                     variant="ghost"
-                    className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+                    className="w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50 transition-colors"
                 >
                     <LogOut className="mr-3 h-4 w-4" />
                     Sign Out
@@ -268,29 +291,29 @@ export default function ProtectedLayout({ children, currentPageName }) {
       </div>
 
       {/* Mobile header & Main content */}
-      <div className="lg:pl-56 flex flex-col flex-1">
-        <div className="sticky top-0 z-10 lg:hidden pl-1 pt-1 sm:pl-3 sm:pt-3 bg-white border-b border-gray-200">
+      <div className="lg:pl-64 flex flex-col flex-1">
+        <div className="sticky top-0 z-10 lg:hidden pl-1 pt-1 sm:pl-3 sm:pt-3 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm">
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" className="h-9 w-9 p-0">
+              <Button variant="ghost" className="h-10 w-10 p-0 rounded-xl">
                 <Menu className="h-6 w-6" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0 bg-black">
+            <SheetContent side="left" className="w-72 p-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700">
               <div className="flex flex-col h-full">
-                <div className="flex items-center gap-3 p-4 border-b border-gray-700">
-                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
-                    <Home className="w-5 h-5 text-white" />
+                <div className="flex items-center gap-3 p-6 border-b border-white/10">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shadow-lg">
+                    <Sparkles className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h1 className="text-lg font-bold text-white">OneCareDesk</h1>
+                    <h1 className="text-xl font-bold text-white">OneCareDesk</h1>
                     {agencyInfo && (
-                      <p className="text-xs text-amber-300 font-semibold">{agencyInfo.name}</p>
+                      <p className="text-xs text-blue-100 font-medium">{agencyInfo.name}</p>
                     )}
                   </div>
                 </div>
                 
-                <nav className="flex-1 p-2 space-y-1">
+                <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
                   {navigationItems.map((item) => {
                     const isActive = location.pathname === item.href;
                     return (
@@ -298,15 +321,15 @@ export default function ProtectedLayout({ children, currentPageName }) {
                         key={item.name}
                         to={item.href}
                         onClick={() => setMobileMenuOpen(false)}
-                        className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
+                        className={`group flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all ${
                           isActive
-                            ? 'bg-blue-700 text-white'
-                            : 'text-gray-300 hover:bg-gray-900 hover:text-white'
+                            ? 'bg-white text-blue-600 shadow-lg'
+                            : 'text-white/80 hover:bg-white/10 hover:text-white'
                         }`}
                       >
                         <item.icon
                           className={`mr-3 flex-shrink-0 h-5 w-5 ${
-                            isActive ? 'text-white' : 'text-gray-400 group-hover:text-white'
+                            isActive ? 'text-blue-600' : 'text-white/70'
                           }`}
                         />
                         {item.name}
@@ -315,29 +338,29 @@ export default function ProtectedLayout({ children, currentPageName }) {
                   })}
                 </nav>
 
-                <Separator className="bg-gray-700" />
+                <Separator className="bg-white/10" />
 
-                <div className="p-2">
+                <div className="p-4">
                     <Popover>
                         <PopoverTrigger asChild>
-                           <Button variant="ghost" className="w-full text-left justify-between items-center text-white p-2 hover:bg-gray-900">
+                           <Button variant="ghost" className="w-full text-left justify-between items-center text-white p-3 hover:bg-white/10 rounded-xl">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shadow-lg">
                                         <UserIcon className="w-5 h-5 text-white" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold truncate">{user.full_name}</p>
-                                        <p className="text-xs text-gray-400 capitalize truncate">{user.role?.replace('_', ' ')}</p>
+                                        <p className="text-xs text-blue-100 capitalize truncate">{user.role?.replace('_', ' ')}</p>
                                     </div>
                                 </div>
                                 <ChevronUp className="w-4 h-4" />
                             </Button>
                         </PopoverTrigger>
-                      <PopoverContent side="top" align="start" className="w-60 bg-gray-900 border-gray-700 text-white p-2 mb-2">
+                      <PopoverContent side="top" align="start" className="w-60 bg-white border-gray-200 shadow-xl p-2 mb-2">
                         <Button
                             onClick={handleLogout}
                             variant="ghost"
-                            className="w-full justify-start text-gray-300 hover:text-white hover:bg-gray-800"
+                            className="w-full justify-start text-gray-700 hover:text-red-600 hover:bg-red-50"
                         >
                             <LogOut className="mr-3 h-5 w-5" />
                             Sign Out

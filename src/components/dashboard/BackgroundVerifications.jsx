@@ -18,9 +18,10 @@ export default function BackgroundVerifications() {
 
   const loadBackgroundVerifications = async () => {
     try {
-      const allCaregivers = await Caregiver.list("-created_date", 50);
+      const allCaregivers = await Caregiver.list();
       const pendingVerifications = allCaregivers
         .filter(c => ['pending', 'in_progress'].includes(c.background_check_status))
+        .slice(0, 50)
         .map(c => ({
           id: c.id,
           name: `${c.first_name} ${c.last_name}`,
